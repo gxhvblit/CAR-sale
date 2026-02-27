@@ -7,10 +7,10 @@ from google.oauth2.service_account import Credentials
 # --- CONFIG ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17Nq4MVLOKtdantiDayXwAgPRZKCvkI1FD4n7FJMZlJo/edit#gid=0"
 COL_MAP_DEFAULT = {
-    "total": "Unnamed: 27",
+    "total": "Unnamed: 29",
     "ppv_suv_base": "Unnamed: 14",
-    "pickup": ["Unnamed: 19", "Unnamed: 20", "Unnamed: 21", "Unnamed: 22"],
-    "commercial": ["Unnamed: 16", "Unnamed: 17", "Unnamed: 18", "Unnamed: 26"],
+    "pickup": ["Unnamed: 20", "Unnamed: 21", "Unnamed: 22", "Unnamed: 23", "Unnamed: 24"],
+    "commercial": ["Unnamed: 17", "Unnamed: 18", "Unnamed: 19", "Unnamed: 28"],
 }
 
 # --- FUNCTIONS ---
@@ -72,3 +72,4 @@ if file and st.button("Extract & Upload to Google Sheets"):
             st.warning("Could not find 'TTL.' row in the Excel sheet.")
     except Exception as e:
         st.error(f"Error: {e}")
+
