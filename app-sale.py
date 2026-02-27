@@ -9,7 +9,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/17Nq4MVLOKtdantiDayXwAgPRZKC
 COL_MAP_DEFAULT = {
     "total": "Unnamed: 29",
     "ppv_suv_base": "Unnamed: 14",
-    "pickup": ["Unnamed: 20", "Unnamed: 21", "Unnamed: 22", "Unnamed: 23"],
+    "pickup": ["Unnamed: 20", "Unnamed: 21", "Unnamed: 22", "Unnamed: 23", "Unnamed: 24"],
     "commercial": ["Unnamed: 17", "Unnamed: 18", "Unnamed: 19", "Unnamed: 28"],
 }
 
@@ -72,5 +72,6 @@ if file and st.button("Extract & Upload to Google Sheets"):
             st.warning("Could not find 'TTL.' row in the Excel sheet.")
     except Exception as e:
         st.error(f"Error: {e}")
+
 
 
