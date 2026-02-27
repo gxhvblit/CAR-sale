@@ -4,9 +4,8 @@ import gspread
 from gspread_dataframe import set_with_dataframe, get_as_dataframe
 from google.oauth2.service_account import Credentials
 
-# --- SETTINGS & CONFIG ---
+# --- CONFIG ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17Nq4MVLOKtdantiDayXwAgPRZKCvkI1FD4n7FJMZlJo/edit#gid=0"
-JSON_KEY_FILE = 'my-python-sale.json'
 COL_MAP_DEFAULT = {
     "total": "Unnamed: 27",
     "ppv_suv_base": "Unnamed: 14",
@@ -17,19 +16,20 @@ COL_MAP_DEFAULT = {
 # --- FUNCTIONS ---
 def get_gspread_client():
     scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-    creds = Credentials.from_service_account_file(JSON_KEY_FILE, scopes=scopes)
+    # ดึงค่าจาก st.secrets แทนไฟล์ JSON
+    creds_info = st.secrets["gcp_service_account"]
+    creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
     return gspread.authorize(creds)
 
 def process_excel(file, year, month):
-    """ Logic การคำนวณจาก Code เดิมของคุณ """
+    # รองรับทั้ง .xls และ .xlsx
     df = pd.read_excel(file, sheet_name="Retail Sales Record by Brand")
-    # ค้นหาแถวที่มีคำว่า TTL.
     ttl_rows = df[df.astype(str).apply(lambda row: row.str.contains("TTL.", na=False)).any(axis=1)].copy()
     
     if len(ttl_rows) < 2:
         return None
         
-    row_idx = ttl_rows.index.tolist()[1] # แถวที่ต้องการตาม Logic เดิม
+    row_idx = ttl_rows.index.tolist()[1] 
 
     pick_up = sum(df.loc[row_idx, col] for col in COL_MAP_DEFAULT["pickup"])
     comm = sum(df.loc[row_idx, col] for col in COL_MAP_DEFAULT["commercial"])
@@ -43,44 +43,32 @@ def process_excel(file, year, month):
         "Commercial": int(comm), "PPV_SUV": int(ppv), "Total": int(total_val)
     }
 
-# --- UI INTERFACE ---
-st.set_page_config(page_title="Excel to Google Sheet Automation", layout="wide")
-st.title("🚗 ระบบจัดการข้อมูลยอดขายรถยนต์ (Routine)")
+# --- UI ---
+st.title("🚀 Sales Data Uploader")
 
 with st.sidebar:
-    st.header("ตั้งค่าข้อมูล")
-    selected_year = st.selectbox("เลือกปี (พ.ศ.)", ["2567", "2568", "2569"])
-    selected_month = st.selectbox("เลือกเดือน", ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-    uploaded_file = st.file_uploader("อัปโหลดไฟล์ Excel (.xls, .xlsx)", type=["xls", "xlsx"])
+    st.header("⚙️ Setting")
+    year = st.selectbox("Year", ["2567", "2568", "2569"])
+    month = st.selectbox("Month", ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+    file = st.file_uploader("Upload Excel File", type=["xls", "xlsx"])
 
-if uploaded_file and st.button("เริ่มประมวลผลและอัปโหลด"):
+if file and st.button("Extract & Upload to Google Sheets"):
     try:
-        with st.spinner('กำลังอ่านไฟล์และคำนวณ...'):
-            # 1. คำนวณข้อมูลจากไฟล์ที่อัปโหลด
-            new_data = process_excel(uploaded_file, selected_year, selected_month)
+        data = process_excel(file, year, month)
+        if data:
+            gc = get_gspread_client()
+            sh = gc.open_by_url(SHEET_URL)
+            worksheet = sh.get_worksheet(0)
             
-            if new_data:
-                # 2. เชื่อมต่อ Google Sheets
-                gc = get_gspread_client()
-                sh = gc.open_by_url(SHEET_URL)
-                worksheet = sh.get_worksheet(0)
-                
-                # 3. ดึงข้อมูลเก่าลงมาเพื่อ Append (หรือเช็คข้อมูลซ้ำ)
-                existing_df = get_as_dataframe(worksheet).dropna(how='all').dropna(axis=1, how='all')
-                new_row_df = pd.DataFrame([new_data])
-                
-                # รวมข้อมูลเก่าและใหม่
-                updated_df = pd.concat([existing_df, new_row_df], ignore_index=True)
-                
-                # 4. เขียนกลับลงไป
-                set_with_dataframe(worksheet, updated_df)
-                
-                st.success(f"✅ อัปโหลดข้อมูลเดือน {selected_month} {selected_year} เรียบร้อยแล้ว!")
-                st.table(new_row_df)
-            else:
-                st.error("ไม่พบแถวข้อมูล 'TTL.' ในไฟล์ที่อัปโหลด")
+            # ดึงข้อมูลเก่า และเพิ่มบรรทัดใหม่
+            existing_df = get_as_dataframe(worksheet).dropna(how='all').dropna(axis=1, how='all')
+            new_row_df = pd.DataFrame([data])
+            updated_df = pd.concat([existing_df, new_row_df], ignore_index=True)
+            
+            set_with_dataframe(worksheet, updated_df)
+            st.success(f"Uploaded {month} {year} successfully!")
+            st.dataframe(new_row_df)
+        else:
+            st.warning("Could not find 'TTL.' row in the Excel sheet.")
     except Exception as e:
-        st.error(f"เกิดข้อผิดพลาด: {e}")
-
-st.divider()
-st.info("คำแนะนำ: เลือกเดือนและปีให้ถูกต้องก่อนอัปโหลด เพื่อให้ข้อมูลใน Google Sheets ไม่สับสน")
+        st.error(f"Error: {e}")
